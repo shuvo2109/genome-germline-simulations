@@ -20,6 +20,7 @@ Usage:
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import hmodel as H
 
 # ── Global style ──────────────────────────────────────────────────
 mpl.rcParams.update({
@@ -143,6 +144,15 @@ def simulate_postgenome(M, k, U, mu_t, G, seed):
     return mean_fitness
 
 
+def pre_genome_curve(k, mu, s, tau, G):
+    x, out = 1.0, [1.0]
+    for _ in range(G):
+        for _ in range(tau):
+            x = x * (1 - mu)
+            x = x / (x + (1 - x) * (1 + s))     # exactly the per-round update in simulate_pregenome()
+        out.append(x ** k)
+    return np.array(out)
+
 # ══════════════════════════════════════════════════════════════════
 # FIGURE 1: THE COORDINATION PROBLEM
 # ══════════════════════════════════════════════════════════════════
@@ -207,6 +217,7 @@ def make_figure3():
     U = 0.005     # per-gene genome mutation rate
     mu_t = 0.005  # translational error rate
     n_reps = 5    # replicate simulations
+    p = H.Par(M=M, G=G, mu=mu, s=s, tau=tau,n=n, U=U, mu_t=mu_t)
 
     fig, axes = plt.subplots(2, 2, figsize=(6.5, 6.2))
     ax_a, ax_b = axes[0]
@@ -223,9 +234,14 @@ def make_figure3():
     k_det = 20
     mu_eff = mu / 100  # illustrative effective rate, see caption
     s_eff = 0.02 / 100  # matching rescaling for the cheater curve
-    ax_a.plot(t, np.exp(-k_det * mu_eff * tau * t),
-              color=colors[1], label='Pre-genome (s = 0)')
-    ax_a.plot(t, np.exp(-k_det * (mu_eff + s_eff) * tau * t),
+    pre_s0 = pre_genome_curve(k_det, mu_eff, 0.0, tau, 500)
+    pre_s = pre_genome_curve(k_det, mu_eff, s_eff, tau, 500)
+
+    ax_a.plot(t, pre_s0,
+              color=colors[1],
+              label='Pre-genome (s = 0)')
+
+    ax_a.plot(t, pre_s,
               color=colors[4], ls='--',
               label='Pre-genome (s > 0, cheaters)')
     ax_a.plot(t, np.full_like(t, (1 - mu)**k_det, dtype=float),
@@ -286,31 +302,57 @@ def make_figure3():
     ax_c.set_title('C', loc='left', fontweight='bold', pad=6)
 
     # ── Panel D: equilibrium fitness vs k ─────────────────────────
-    k_scan = np.array([5, 10, 15, 20, 30, 40, 50, 75, 100])
-    pre_eq_m, pre_eq_s, post_eq_m, post_eq_s = [], [], [], []
-    for k_val in k_scan:
-        pre_eqs = [
-            np.mean(simulate_pregenome(
-                M, k_val, n, mu, s, tau, G,
-                1000 + r + k_val * 100)[400:])
-            for r in range(n_reps)
-        ]
-        post_eqs = [
-            np.mean(simulate_postgenome(
-                M, k_val, U, mu_t, G,
-                1000 + r + k_val * 100 + 5000)[400:])
-            for r in range(n_reps)
-        ]
-        pre_eq_m.append(np.mean(pre_eqs))
-        pre_eq_s.append(np.std(pre_eqs))
-        post_eq_m.append(np.mean(post_eqs))
-        post_eq_s.append(np.std(post_eqs))
-        print(f'  Panel D: k={k_val} done')
+    h_values = [1.0, 0.9, 0.5, 0.0]
+    h_colors = {
+        1.0: "#D55E00",
+        0.9: "#CC79A7",
+        0.5: "#009E73",
+        0.0: "#0072B2",
+    }
 
-    ax_d.errorbar(k_scan, pre_eq_m, yerr=pre_eq_s, color=pre_color,
-                  marker='o', markersize=4, capsize=3, label='Pre-genome')
-    ax_d.errorbar(k_scan, post_eq_m, yerr=post_eq_s, color=post_color,
-                  marker='s', markersize=4, capsize=3, label='Post-genome')
+    h_markers = {
+        1.0: "o",
+        0.9: "s",
+        0.5: "^",
+        0.0: "D",
+    }
+
+    k_scan = np.array([1, 2, 5, 10, 15, 20, 30, 40, 50, 75, 100])
+
+    for h in h_values:
+        means = []
+        stds = []
+
+        for k in k_scan:
+            results = []
+
+            for r in range(n_reps):
+                base_seed = 1000 + r + k * 100
+
+                if h == 1.0:
+                    seed = base_seed
+                elif h == 0.0:
+                    seed = base_seed + 5000
+                else:
+                    seed = base_seed + 10000
+
+                trajectory = H.simulate(h, k, p, seed)
+                results.append(trajectory[400:].mean())
+
+            means.append(np.mean(results))
+            stds.append(np.std(results))
+
+        ax_d.errorbar(
+            k_scan,
+            means,
+            yerr=stds,
+            color=h_colors[h],
+            marker=h_markers[h],
+            markersize=4,
+            capsize=3,
+            label=f"h = {h:g}"
+        )
+
     ax_d.set_xlabel('Network complexity, k')
     ax_d.set_ylabel('Equilibrium fitness')
     ax_d.set_xlim(0, 105)
