@@ -1,9 +1,9 @@
 """
 Generate new figure (Fig 5) for complexity ceiling, invasion fitness, critical complexity k_hat and evolutionarily
 stable h_ESS, and ratchet condition for adding a catalyst
-evolutionarily stable templating fraction h_ESS(k).   Run:  python 02_kstar_invasion.py   (~2-3 min)
+evolutionarily stable templating fraction h_ESS(k).
 
-Figure 4 : Ceiling and invasion. (3 panels).
+Figure 5 : Ceiling and invasion. (3 panels).
   - A: Complexity ceiling for a viability threshold
   - B: Critical complexity
   - C: Stable templating fraction
@@ -118,7 +118,7 @@ if print_results:
     print(f"\nB. Invasion fitness s_inv (c0 = {c0}): simulation vs analytical")
     print(f"{'h_res -> h_inv':>16} {'k':>5} {'simulation':>18} {'analytic':>10} {'k_hat':>9}")
 
-    for h_res, h_inv in [(0.8, 0.7), (0.5, 0.4), (0.2, 0.1)]:
+    for h_res, h_inv in [(0.8, 0.7), (0.5, 0.4), (0.2, 0.1), (0.9, 0.8), (0.95, 0.9)]:
         for k in [20, 50]:
             sims = [
                 invasion_sim(h_res, h_inv, k, c0, seed=r + 3 * k)
